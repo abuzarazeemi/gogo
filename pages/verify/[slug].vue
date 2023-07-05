@@ -1,0 +1,164 @@
+<template>
+  <div class="container px-5 mx-auto mt-10 mb-5" v-if="settings">
+    <div class="">
+      <div class="p-5 mx-auto rounded shadow-lg sm:p-12 md:w-124">
+        <p class="mb-5 md:text-2xl font-semibold">Verification</p>
+        <div>
+            <input
+              type="tel"
+              v-model="code"
+              placeholder="code"
+              id="phone"
+              class="
+                block
+                md:w-full
+                w-38
+                px-2
+                py-2
+                text-sm
+                border border-gray-300
+                rounded
+                dark:border-gray-600 dark:bg-gray-700
+                focus:border-purple-400
+                focus:outline-none
+                focus:shadow-outline-purple
+                dark:text-gray-300 dark:focus:shadow-outline-gray
+                form-input
+              "
+            />
+          
+          <div class="w-full mt-8" v-if="settings">
+            <button
+              type="button"
+              :style="{ 'background-color': settings.colors.primaryColor }"
+              @click="verify"
+              class="w-full px-10 py-2 text-center text-white rounded"
+            >
+              Verify
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <Download />
+</template>
+<script>
+import axios from "axios";
+import { VueTelInput } from 'vue-tel-input'
+import Download from "@/components/Downloads.vue";
+import { notify } from "@kyvg/vue3-notification";
+import {useStorageStore} from '@/store/storage.js';
+
+export default {
+  name: "Login",
+  components: {
+    Download,
+    VueTelInput,
+  },
+  head() {
+    return {
+      title: "GoGo app: Grocery,Vegetables, Food, Taxi Booking & Courier",
+      meta: [
+        {
+          name: 'description',
+          content: 'GoGo the best delivery app gets you Food, Grocery, Medicine, Pet Supplies, Fruits & Vegetables, Meat & Fish, Health & Wellness, Gifts and Send Packages from.'
+        }
+      ]
+    }
+  },
+  data() {
+    return {
+      code: null,
+      settings: null,
+      isLoggedIn: false,
+      user: null,
+      phone: JSON.parse(!process.server ? localStorage.getItem("phone") : null),
+      base_url: this.store.baseUrl,
+      countryCode: null,
+    };
+  },
+
+  setup() {
+    const store = useStorageStore();
+    return { store };
+  },
+
+  mounted() {
+    this.store.setLoading(true)
+    axios
+      .get(this.base_url + "api/app/settings")
+      .then((response) => {
+        this.store.setLoading(false)
+        this.settings = response.data;
+        console.log(this.settings)
+      })
+      .catch((error) => console.log(error));
+
+    axios
+      .post(this.base_url + "api/otp/send/",
+      {
+        phone: this.phone,
+      })
+      .then((response) => {
+        notify({
+          type: "success",
+          title: "Verification",
+          text: response.data.message,
+        });
+      })
+      .catch((error) => console.log(error));
+
+    //   if (localStorage.getItem("authToken")) {
+    //   this.isLoggedIn = true;
+    //   this.user = JSON.parse(localStorage.getItem("user"));
+    // }
+
+    // if (this.isLoggedIn == false) {
+    //   this.$router.push("/login");
+    //   localStorage.removeItem("user");
+    // //   localStorage.removeItem("authToken");
+    // }
+  },
+
+  methods: {
+    verify() {
+      this.store.setLoading(true)
+      axios
+        .post(this.base_url + "api/otp/verify", {
+          phone: this.phone,
+          code: this.code,
+          is_login: true
+        })
+        .then((response) => {
+           console.log(response)
+            !process.server ? localStorage.setItem("authToken", response.data.token) : null;
+            !process.server ? localStorage.setItem("user", JSON.stringify(response.data.user)) : null;
+            !process.server ? localStorage.removeItem("phone") : null;
+            window.location.href = "/";
+          // console.log(this.settings)
+          notify({
+            type: "success",
+            title: "Verification",
+            text: response.data.message,
+          });
+        })
+        .catch((error) => {
+          console.log(error);
+          notify({
+            type: "error",
+            title: "Verification",
+            text: error.response.data.message,
+          });
+        })
+        .finally(() => this.store.setLoading(false));
+    },
+
+    countryChanged(country) {
+      this.countryCode = country.dialCode;
+      console.log(this.countryCode);
+    },
+  },
+};
+</script>
+
